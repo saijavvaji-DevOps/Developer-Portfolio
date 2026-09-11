@@ -1,0 +1,66 @@
+services:
+  mysql:
+    image: mysql:8.4
+    container_name: portfolio-mysql
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      MYSQL_DATABASE: ${MYSQL_DATABASE}
+      MYSQL_USER: ${MYSQL_USER}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+    volumes:
+      - mysql_data:/var/lib/mysql
+    networks:
+      - portfolio-network
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "mysqladmin ping -h localhost -u root -p$${MYSQL_ROOT_PASSWORD}"
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 15
+      start_period: 30s
+
+  backend:
+    build:
+      context: ./App_Server
+    image: developer-portfolio-backend:latest
+    container_name: portfolio-backend
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      DB_HOST: mysql
+      DB_PORT: 3306
+      DB_NAME: ${MYSQL_DATABASE}
+      DB_USER: ${MYSQL_USER}
+      DB_PASSWORD: ${MYSQL_PASSWORD}
+    depends_on:
+      mysql:
+        condition: service_healthy
+    networks:
+      - portfolio-network
+
+  frontend:
+    build:
+      context: ./Portfolio
+    image: developer-portfolio-frontend:latest
+    container_name: portfolio-frontend
+    restart: unless-stopped
+    depends_on:
+      - backend
+    ports:
+      - "80:80"
+    networks:
+      - portfolio-network
+
+volumes:
+  mysql_data:
+
+networks:
+  portfolio-network:
+    driver: bridge
